@@ -29,7 +29,7 @@ class MineField:
     WHITE = (255, 255, 255)
     RED = (255, 0, 0)
     BLACK = (0, 0, 0)
-    LINEAR_SEARCH_RANGE = 40
+    LINEAR_SEARCH_RANGE = 5
 
     # 0 to pusta kratka
     # -2 mina
@@ -57,7 +57,7 @@ class MineField:
         self.sct = mss.mss()
         # mss.tools.to_png(image.rgb, image.size, output='test.png')
 
-
+        # TODO: jak są kandydaci, to niech nie daje mi żadnych kandydatów co nie mają pustych pól koło siebie!
         self.restart_button = (self.win_rect['width'], 20)
         # mss.tools.to_png(self.image_map.rgb, self.image_map.size, 'minefield/field.png')
 
@@ -88,9 +88,9 @@ class MineField:
         x, y = self._from_tile(tile_x, tile_y)
         x += self.win_rect['left']
         y += self.win_rect['top']
-        sleep(0.02)
+        # sleep(0.02)
         win32api.SetCursorPos((x, y))
-        sleep(0.02)
+        # sleep(0.02)
         win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, x, y, 0, 0)
 
         win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, x, y, 0, 0)
@@ -99,9 +99,9 @@ class MineField:
         x, y = self._from_tile(tile_x, tile_y)
         x += self.win_rect['left']
         y += self.win_rect['top']
-        sleep(0.02)
+        # sleep(0.02)
         win32api.SetCursorPos((x, y))
-        sleep(0.02)
+        # sleep(0.02)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, x, y, 0, 0)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, x, y, 0, 0)
 
@@ -224,19 +224,19 @@ class MineField:
             changed = self._solver()
             self.refresh()
             if not changed:
-                print(repr(self))
-                x, y = self.linear_equasions()
+                # print(repr(self))
+                x, y, prob = self.linear_equasions()
+                if prob < 0.5:
+                    self.left_click(x, y)
+                else:
+                    self.right_click(x, y)
                 # x, y = self._press_random_field()
-                changed = True
                 self.refresh()
                 if self.get_number(x, y) == -3:
                     print('Wylosowane złą liczbę!')
-                    exit()
                     return False
                 else:
                     print('Wszystko wygląda spoko!')
-                    print(self.get_number(x, y))
-                    exit()
                 last_random_choice = (x, y)
                 # print(repr(self))
                 # sleep(3)
@@ -306,12 +306,18 @@ class MineField:
                 _y += y
                 for _x in range(-1, 2):
                     _x += x
-                    if self.in_bounds(_x, _y) and self.map[_y][_x] == -1:
-                        eq[(_x, _y)] = 1
+                    if self.in_bounds(_x, _y):
+                        if self.map[_y][_x] == -1:
+                            # jeżeli puste pole
+                            eq[(_x, _y)] = 1
+                        if self.map[_y][_x] == -4:
+                            # jeżeli falga
+                            eq[(_x, _y)] = -1
             return eq, sum
 
         candidates = self._get_candidate()
-
+        # print('Kandydaci', candidates)
+        print('*'*10)
         sums = []
         equasions = []
         variables = set()
@@ -327,7 +333,8 @@ class MineField:
                 if var not in eq:
                     eq[var] = 0
 
-        keys = list(variables)
+        keys = sorted(list(variables))
+
         new_equasions = []
 
         for eq in equasions:
@@ -339,73 +346,29 @@ class MineField:
         a = np.array(new_equasions)
         b = np.array(sums)
         print(keys)
-        # [print(c, '=', o) for c, o in zip(equasions,sums)]
+        for eq, s in zip(a, b):
+            pass
+            print(eq, '->', s)
+        [print(c, '=', o) for c, o in zip(equasions,sums)]
         try:
-            x = np.linalg.solve(a, b)
+            solution = np.linalg.solve(a, b).round(3)
             print('Dokładne obliczanie równanie!!!!')
-            [print(c) for c in x]
         except:
             x = np.linalg.lstsq(a, b)
-            print('-'*10)
-            print(x[0].round(3))
+            print(x)
+            solution = x[0].round(decimals=3)
             print('-' * 10)
             print('Niedokładne obliczanie równania')
 
-        good_solutions = []
-        for solution in x:
-            if isinstance(solution, np.ndarray) and len(solution) == len(keys):
-                solution = np.round(solution, decimals=2)
-                good_solutions.append(solution)
-                print('[\n',
-                      '\n'.join([str(key) + ' -> ' + str(h) for h, key in zip(solution, keys)]),
-                      '\n]')
+        print('[\n',
+              '\n'.join([str(key) + ' -> ' + str(h) for h, key in zip(solution, keys)]),
+              '\n]')
 
-        if len(good_solutions) == 1:
-            min_index, min_val = min(enumerate(good_solutions[0]), key=lambda p: p[1])
-            max_index, max_val = max(enumerate(good_solutions[0]), key=lambda p: p[1])
-            # print('min {} -> {}'.format(keys[min_index], min_val))
-            # print('max {} -> {}'.format(keys[max_index], max_val))
-            # trzeba sprawdzić czy bliże min do 0, czy maxowi do 1
-            dmin, dmax = abs(min_val), (1 - max_val)
-            x, y = keys[min_index]
-            print()
-            if dmin > dmax:
-                # bliżej wartości maksymalnej do 1
-                print('BOMB at ({}, {})'.format(x, y))
-                self.right_click(x, y)
-
-            else:
-                # bliżej wartości minimalnej do 0
-                print('SAFE at ({}, {})'.format(x, y))
-                self.left_click(x, y)
-
-
-        else:
-            new = []
-            for row in zip(*good_solutions):
-                new.append(reduce(lambda a, b: round(float(abs(a - b)), 2), row))
-            print('Reduced:')
-            print(new)
-            min_index, min_val = min(enumerate(new), key=lambda p: p[1])
-
-            # Trzeba sprawdzić bliżej temu do bomby czy do pustego pola
-            print('min {} -> {}'.format(keys[min_index], min_val))
-            value = good_solutions[0][min_index]
-            print('Value ->', value)
-            print('abs(value) > 1 - value')
-            print('abs({0}) > 1 - {0}'.format(value))
-            print(abs(value) > 1 - value)
-            x, y = keys[min_index]
-            if abs(value + min_val) > 1 - value + min_val:
-                # bliżej temu do 1
-                print('BOMB at ({}, {})'.format(*keys[min_index]))
-                self.right_click(x, y)
-            else:
-                # bliżej temu do 0
-                print('SAFE at ({}, {})'.format(*keys[min_index]))
-                self.left_click(x, y)
-        return x, y
-
+        min_index, prob = min(enumerate(solution), key=lambda p: abs(p[1]))
+        x, y = keys[min_index]
+        print('{} with {} probability that its a mine!'.format((x, y), abs(prob)))
+        # self.left_click(x, y)
+        return x, y, prob
         # return None, None
 
     def _get_candidate(self):
