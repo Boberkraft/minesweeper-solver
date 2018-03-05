@@ -29,7 +29,7 @@ class MineField:
     WHITE = (255, 255, 255)
     RED = (255, 0, 0)
     BLACK = (0, 0, 0)
-    LINEAR_SEARCH_RANGE = 5
+    LINEAR_SEARCH_RANGE = 300
 
     # 0 to pusta kratka
     # -2 mina
@@ -76,6 +76,10 @@ class MineField:
         self.refresh()  # załaduj obraz mape
         # sleep(1)
 
+    def restart(self):
+        self.click_restart_button()
+        self.init()
+
     def click_restart_button(self):
         x = self.win_rect['left'] + self.win_rect['width'] // 2  # X of the face
         y = self.win_rect['top'] + 20  # Y of the face
@@ -84,7 +88,9 @@ class MineField:
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, x, y, 0, 0)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, x, y, 0, 0)
 
+
     def right_click(self, tile_x: int, tile_y: int):
+        print('({:>2}, {:>2}) ->\tBOMB'.format(tile_x, tile_y))
         x, y = self._from_tile(tile_x, tile_y)
         x += self.win_rect['left']
         y += self.win_rect['top']
@@ -96,6 +102,7 @@ class MineField:
         win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, x, y, 0, 0)
 
     def left_click(self, tile_x: int, tile_y: int):
+        print('({:>2}, {:>2}) ->\tSAFE'.format(tile_x, tile_y))
         x, y = self._from_tile(tile_x, tile_y)
         x += self.win_rect['left']
         y += self.win_rect['top']
@@ -113,7 +120,7 @@ class MineField:
         """Odświeża obraz mapy"""
         win32api.SetCursorPos((self.win_rect['left'], self.win_rect['top']))
         self.image_map = self.sct.grab(self.win_rect)
-        self.load_to_array()
+        return self.load_to_array()
 
     def get_tile_image(self, tile_x: int, tile_y: int) -> None:
         x, y = self._from_tile(tile_x, tile_y)
@@ -202,7 +209,10 @@ class MineField:
             ans.append(' '.join(str(n) for n in row))
         return str(self) + '\n' + '\n'.join(ans)
 
-    def load_to_array(self):
+    def _lost(self):
+        print('\nYou lost!!! SORRY but YOU asked for it!!!!\n')
+
+    def load_to_array(self) -> bool:
 
         columns, rows = self.map_dimensions()
         self.map = []
@@ -210,42 +220,53 @@ class MineField:
             n = []
             for x in range(columns):
                 num = self.get_number(x, y)
+                if num == -3:
+                    # sorry you lost
+                    return True
                 n.append(num)
                 if self.net_mask[y][x] == 0:
                     if num == 0 or num == -4:
                         # pusta kratka lub flaga
                         self.net_mask[y][x] = 1
             self.map.append(n)
+        return False
 
-    def solver(self):
-
-        last_random_choice = (-1, -1)
+    def solver(self) -> bool:
+        # TODO: no bo ten rozwiązywacz równań i tak jakoś ma dość duży pustych równań
+        # Czemu one się dodaja pomimo że nie powinny?
+        # Kto to wie a kto nie ten niech wie....
         while True:
+            lost = self.refresh()
+            if lost:
+                self._lost()
+                return False
             changed = self._solver()
-            self.refresh()
             if not changed:
-                # print(repr(self))
-                x, y, prob = self.linear_equasions()
-                if prob < 0.5:
-                    self.left_click(x, y)
-                else:
-                    self.right_click(x, y)
-                # x, y = self._press_random_field()
-                self.refresh()
-                if self.get_number(x, y) == -3:
-                    print('Wylosowane złą liczbę!')
-                    return False
-                else:
-                    print('Wszystko wygląda spoko!')
-                last_random_choice = (x, y)
-                # print(repr(self))
-                # sleep(3)
+                _min, _max, changed = self.linear_equasions()
+                # print(_min, _max, changed)
+                if changed is None:
+                    return True
+                if changed is False:
+                    # lets try our luck
+                    (min, min_prob), (max, max_prob) = _min, _max
+                    dmin, dmax = abs(min_prob), (1 - max_prob)
+                    if dmin > dmax:
+                        # wartości maksymalnej jest bliżej do 0 lub 1
+                        x, y = max
+                        print('CHOOSING RANDOM BOMB ({} prob))'.format(abs(max_prob)))
+                        self.right_click(x, y)
+
+                    else:
+                        # wartości minimalna jest bliżej do 0 lub 1
+                        print('CHOOSING RANDOM SAVE SPOT ({} prob)'.format(abs(min_prob)))
+                        x, y = min
+                        self.left_click(x, y)
+
 
     def in_bounds(self, _x: int, _y: int):
         return 0 <= _y < self.columns and 0 <= _x < self.rows
 
     def _solver(self):
-
         changed = False
 
         for y in range(self.columns):
@@ -302,28 +323,30 @@ class MineField:
         def do_equasion(x, y):
             eq = dict()
             sum = self.map[y][x]
-            for _y in range(-1, 2):
-                _y += y
-                for _x in range(-1, 2):
-                    _x += x
-                    if self.in_bounds(_x, _y):
-                        if self.map[_y][_x] == -1:
-                            # jeżeli puste pole
-                            eq[(_x, _y)] = 1
-                        if self.map[_y][_x] == -4:
-                            # jeżeli falga
-                            eq[(_x, _y)] = -1
+            for _x, _y in self.field_neighborhood(x, y):
+                if self.in_bounds(_x, _y):
+                    if self.map[_y][_x] == -1:
+                        # jeżeli puste pole
+                        eq[(_x, _y)] = 1
+                    if self.map[_y][_x] == -4:
+                        # jeżeli falga
+                        # eq[(_x, _y)] = 1
+                        sum -= 1
             return eq, sum
 
         candidates = self._get_candidate()
-        # print('Kandydaci', candidates)
-        print('*'*10)
+        # print('Kandydaci', sorted(list(candidates)))
+        # print('*' * 10)
         sums = []
         equasions = []
         variables = set()
+        if candidates is None:
+            return None, None, None
+
         for _x, _y in candidates:
             equasion, sum = do_equasion(_x, _y)
             # print(equasion, sum, 'for {} x {}'.format(_x, _y))
+
             variables.update(equasion)
             equasions.append(equasion)
             sums.append(sum)
@@ -345,55 +368,79 @@ class MineField:
 
         a = np.array(new_equasions)
         b = np.array(sums)
-        print(keys)
+        # print(keys)
         for eq, s in zip(a, b):
             pass
-            print(eq, '->', s)
-        [print(c, '=', o) for c, o in zip(equasions,sums)]
+            # print(eq, '->', s)
+        # [print(c, '=', o) for c, o in zip(equasions, sums)]
         try:
             solution = np.linalg.solve(a, b).round(3)
-            print('Dokładne obliczanie równanie!!!!')
+            # print('Dokładne obliczanie równanie!!!!')
         except:
             x = np.linalg.lstsq(a, b)
-            print(x)
+            # print(x)
             solution = x[0].round(decimals=3)
-            print('-' * 10)
-            print('Niedokładne obliczanie równania')
+            # print('-' * 10)
+            # print('Niedokładne obliczanie równania')
 
-        print('[\n',
-              '\n'.join([str(key) + ' -> ' + str(h) for h, key in zip(solution, keys)]),
-              '\n]')
+        # print('[\n',
+        #       '\n'.join([str(key) + ' -> ' + str(h) for h, key in zip(solution, keys)]),
+        #       '\n]')
 
-        min_index, prob = min(enumerate(solution), key=lambda p: abs(p[1]))
-        x, y = keys[min_index]
-        print('{} with {} probability that its a mine!'.format((x, y), abs(prob)))
+        changed = False
+        for i, prob in enumerate(solution):
+            key = keys[i]
+            if prob == 0:
+                self.left_click(*key)
+                changed = True
+            if prob == 1:
+                self.right_click(*key)
+                changed = True
+        min_index, min_prob = min(enumerate(solution), key=lambda p: abs(p[1]))
+        max_index, max_prob = max(enumerate(solution), key=lambda p: abs(p[1]))
+        # print('{} with {} probability that its a mine!'.format((x, y), prob))
         # self.left_click(x, y)
-        return x, y, prob
+        return (keys[min_index], min_prob), (keys[max_index], max_prob), bool(changed)
         # return None, None
+
+    def field_neighborhood(self, x, y):
+        for _y in range(-1, 2):
+            _y += y
+            for _x in range(-1, 2):
+                _x += x
+                if self.in_bounds(_x, _y):
+                    yield _x, _y
 
     def _get_candidate(self):
         for y in range(self.columns):
             for x in range(self.rows):
                 if self.net_mask[y][x] == 0 and 0 < self.map[y][x] <= 8:
                     q = set()
-                    print('The candidate!', x, y)
+                    # print('The candidate!', x, y)
                     self._for_search(x, y, q)
                     return q
         return None
 
-    def _for_search(self, x, y, queue):
+    def click_middle_field(self):
+        print('CHOOSING MIDDLE FIELD')
+        width, height = self.map_dimensions()
+        width, height = width // 2, height // 2
+        self.left_click(width, height)
 
-        movement = self.LINEAR_SEARCH_RANGE - len(queue)
+    def _for_search(self, x, y, queue):
         new = set()
+        val = self.map[y][x]
+
         if self.LINEAR_SEARCH_RANGE <= len(queue):
             return
-        for _y in range(-1, 2):
-            _y += y
-            for _x in range(-1, 2):
-                _x += x
-                if self.in_bounds(_x, _y) and 0 < self.map[_y][_x] <= 7:
-                    if (_x, _y) not in queue:
-                        new.add((_x, _y))
+        for _x, _y in self.field_neighborhood(x, y):
+            if self.map[_y][_x] == -4:
+                val -= 1
+            if 0 < self.map[_y][_x] <= 7:
+                if (_x, _y) not in queue:
+                    # print('FROM ({}, {}) ADDING ({}, {})'.format(x, y, _x, _y))
+                    new.add((_x, _y))
+
         queue.update(new)
         for x_, y_ in new:
             self._for_search(x_, y_, queue)
@@ -475,13 +522,14 @@ test_number_finding()
 
 if __name__ == '__main__':
     mine_field = MineField()
+    mine_field.click_restart_button()
+
     solved = False
-    while True:
-        #
-        # mine_field.restart()
+    while solved is False:
+        mine_field.restart()
+        mine_field.click_middle_field()
         start = time.time()
         solved = mine_field.solver()
-        break
     print("Done in {} seconds".format(time.time() - start))
 
 # mine_field.click(0, 0)
