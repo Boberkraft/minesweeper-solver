@@ -12,8 +12,11 @@ from functools import reduce
 
 
 class MineField:
+    # size of individual field where a mine can be
     FIELD_WIDTH = 16
     FIELD_HEIGHT = 16
+
+    # Color of a pixel that identifies what number a field is
     NUMBERS = {
         (192, 192, 192): 0,
         (0, 0, 255): 1,
@@ -29,16 +32,31 @@ class MineField:
     WHITE = (255, 255, 255)
     RED = (255, 0, 0)
     BLACK = (0, 0, 0)
+
+    # max number of fields that can go into one equation at once?
     LINEAR_SEARCH_RANGE = 300
 
-    # 0 to pusta kratka
-    # -2 mina
-    # -5 źle postawiona flaga
-    # -3 nadepnięta miną
-    # 1,2,3,4,5,6,7,8 liczba
-    # -1 nieodkryta krata
-    # -4 flaga
+    # THE MEANING OF NUMBERS IN MAP
+    # 0 is an empty field
+    # -2 mine
+    # -5 missed flag
+    # -3 destroyed mine
+    # 1,2,3,4,5,6,7,8 a number
+    # -1 uncovered field
+    # -4 flag
     def __init__(self):
+        """
+        Searches activate windows for one named `Minesweeper X` getting get coordinates and size
+        next takes a screenshot of desktop to extract that windows and processes it.
+        
+        Functions for user to use:
+        restart() - clicks restart button and initalizes itself
+        solver() - solves the minesweeper. Returns True if solved, False if not.
+        click_middle_field() - clicks the middle field of the minefield
+        
+        WARNING: Durning solving minesweeper if you cover the window containing the game it will stop.
+                 And please dont move the minesweeper window.
+        """
         handle = win32gui.FindWindow(None, 'Minesweeper X')
         assert handle != 0, 'Window not found'
 
@@ -68,19 +86,27 @@ class MineField:
         #                                     width=1920,
         #                                     height=1080))
 
-    def init(self):
-
+    def init(self) -> None:
+        """
+        Creates a new netmask and reflashes game.
+        """
         # sleep(1)
         self.rows, self.columns = self.map_dimensions()
         self.net_mask = [[0 for _ in range(self.rows)] for _ in range(self.rows)]
         self.refresh()  # załaduj obraz mape
         # sleep(1)
 
-    def restart(self):
+    def restart(self) -> None:
+        """
+        Clicks restar button and initializes
+        """
         self.click_restart_button()
         self.init()
 
-    def click_restart_button(self):
+    def click_restart_button(self) -> None:
+        """
+        Clicks restart button
+        """
         x = self.win_rect['left'] + self.win_rect['width'] // 2  # X of the face
         y = self.win_rect['top'] + 20  # Y of the face
 
@@ -88,8 +114,12 @@ class MineField:
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, x, y, 0, 0)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, x, y, 0, 0)
 
-
-    def right_click(self, tile_x: int, tile_y: int):
+    def right_click(self, tile_x: int, tile_y: int) -> None:
+        """
+        Right clicks on a tile using map coordinates
+        :param tile_x: X coordinate of the field
+        :param tile_y: Y coordinate of the field
+        """
         print('({:>2}, {:>2}) ->\tBOMB'.format(tile_x, tile_y))
         x, y = self._from_tile(tile_x, tile_y)
         x += self.win_rect['left']
@@ -101,7 +131,12 @@ class MineField:
 
         win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, x, y, 0, 0)
 
-    def left_click(self, tile_x: int, tile_y: int):
+    def left_click(self, tile_x: int, tile_y: int) -> None:
+        """
+        Left clicks on a tile using map coordinates
+        :param tile_x: X coordinate of the field
+        :param tile_y: Y coordinate of the field
+        """
         print('({:>2}, {:>2}) ->\tSAFE'.format(tile_x, tile_y))
         x, y = self._from_tile(tile_x, tile_y)
         x += self.win_rect['left']
@@ -116,13 +151,22 @@ class MineField:
         # self.get_number(x, y)
         # self.get_tile_image(tile_x, tile_y)
 
-    def refresh(self) -> None:
-        """Odświeża obraz mapy"""
+    def refresh(self) -> bool:
+        """
+        Move cursor to a save position, takes screenshot and loads game status to a variable.
+        :return: True if the game is lost. 
+        """
         win32api.SetCursorPos((self.win_rect['left'], self.win_rect['top']))
         self.image_map = self.sct.grab(self.win_rect)
         return self.load_to_array()
 
     def get_tile_image(self, tile_x: int, tile_y: int) -> None:
+        """
+        Extracts individual field to a .png file.
+        Fun tool, not used.
+        :param tile_x: X coordinate of the field
+        :param tile_y: Y coordinate of the field
+        """
         x, y = self._from_tile(tile_x, tile_y)
         d = dict(top=y + self.win_rect['top'],
                  left=x + self.win_rect['left'],
@@ -134,17 +178,37 @@ class MineField:
         mss.tools.to_png(tile.rgb, tile.size, output='minefield/field{}x{}.png'.format(tile_y, tile_x))
 
     def _from_tile(self, tile_x: int, tile_y: int) -> (int, int):
-        """Zamienia koordynaty ekranu na x i y planszy"""
+        """
+        Translates map coordinates to a display coordinates
+        :param tile_x: X coordinate of the field
+        :param tile_y: Y coordinate of the field
+        :returns tuple (x, y) 
+        """
         x = self.map_x + self.FIELD_WIDTH * tile_x
         y = self.map_y + self.FIELD_HEIGHT * tile_y
         return x, y
 
     def get_number(self, tile_x: int, tile_y: int, image=None) -> int:
+        """
+        Checks what number is in said position 
+        :param tile_x: X coordinate of the field
+        :param tile_y: Y coordinate of the field
+        :param image: Whatever to use a custom image from PIL. 
+                      If not given is uses extracted minesweeper screenshot from display.
+        :return: Int representing a field.
+                 1, 2, 3, 4, 5, 6, 7, 8 a number
+                 0 is an empty field
+                 -1 uncovered field
+                 -2 mine
+                 -3 destroyed mine
+                 -4 flag
+                 -5 missed flag
+        """
 
         x, y = self._from_tile(tile_x, tile_y)
         if image is None:
             image = self.image_map
-        # objaśnienie pól
+        # Game map explanation
         # -2 -2 -1 -2 -2 -1 -2 -2
         # -2 -2 -2 -1 -2 -1 -2 -2
         # -2 -3 -2 -1 -2  6 -2 -2
@@ -154,66 +218,82 @@ class MineField:
         # -2 -2 -2 -2 -2 -2 -2 -2
         # -1 -2 -1 -1 -2 -2 -2 -2
 
-        # 0 to pusta kratka  (lewy górny róg jest szary)
-        #    -2 mina (7, 7 jest biały)
-        #        -5 źle postawiona flaga (8,8 jest czerwony)
-        #        -3 nadepnięta miną (1,1 jest czerwony)
-        #    1,2,3,4,5,6,7,8 oznaczaja kratki z napisaną liczbą (8, 9 mają odpowiednie kolory)
-        # -1 nieodkryta krata (0,0 jest biały)
-        #    -4 flaga (8,8 jest czarny)
+        # 0 is empty, uncovered field  (Lew upper corner is grey)
+        #    -2 a mine (7, 7 is white)
+        #        -5 missed flag (8,8 is red)
+        #        -3 destroyed mine (1,1 is red)
+        #    1,2,3,4,5,6,7,8 a number (8, 9 have colors that indefinites a number)
+        # -1 uncovered field (0,0 is white)
+        #    -4 flag (8,8 is black)
 
         if image.pixel(x, y) == self.DARK_GREY:
-            # puste pole
+            # empty field subtree
 
             if image.pixel(x + 7, y + 7) == self.WHITE:
-                # mina
+                # mine subtree
                 if image.pixel(x + 8, y + 8) == self.RED:
-                    # źle postawiona flaga
-                    return -5
+                    return -5  # missed
+
                 elif image.pixel(x + 1, y + 1) == self.RED:
-                    # nadepnięta mina
-                    return -3
-                return -2
+                    return -3  # destroyed mine
+
+                return -2  # mine
             else:
-                # liczba lub puste pole
+                # a number or empty field
                 return self.NUMBERS[image.pixel(x + 9, y + 8)]
 
         elif image.pixel(x, y) == self.WHITE:
-            # nieodkryta krata
-            # print('unknown')
+            # uncovered field subtree
             if image.pixel(x + 8, y + 8) == self.BLACK:
-                return -4
-            return -1
+                return -4 # flag
+            return -1 # uncovered field
         else:
-            # print('?')
-            raise Exception('{}x{} contains \n\nZabierz wszystkie rzeczy z gry pacanie'.format(tile_x, tile_y))
+            raise Exception('{}x{} contains unknown field type\n\nHave you covered minesweeper screen?\nor moved it!?'.format(tile_x, tile_y))
 
-    def map_dimensions(self):
+    def map_dimensions(self) -> (int, int):
+        """
+        Gives dimensions of a game. 
+        :return: (collumns, rows) 
+        """
         return self.field_dimensions(self.win_rect['width'], self.win_rect['height'])
 
     def field_dimensions(self, width: int, height: int) -> (int, int):
+        """
+        Translates width and height to number of fields.
+        It excepts size of whole minesweeper game, not only that clickable part.
+        It automatically removes the borders!
+        :param width: 
+        :param height: 
+        :return: (number of tiles in X axis, number of tiles in Y axis) 
+        """
         h = height - (self.map_y + self.map_x)
         w = width - 2 * self.map_x
         return w // self.FIELD_WIDTH, h // self.FIELD_HEIGHT
 
-    def __str__(self):
+    def __str__(self) -> str:
         ans = []
         for row in self.map:
             ans.append(' '.join(' ' + str(n) if n >= 0 else str(n) for n in row))
         return '\n'.join(ans)
 
-    def __repr__(self):
-
+    def __repr__(self) -> str:
+        """
+        Additionally contains net mask
+        """
         ans = []
         for row in self.net_mask:
             ans.append(' '.join(str(n) for n in row))
         return str(self) + '\n' + '\n'.join(ans)
 
-    def _lost(self):
+    def _lost(self) -> None:
         print('\nYou lost!!! SORRY but YOU asked for it!!!!\n')
 
     def load_to_array(self) -> bool:
-
+        """
+        Processes game image creating new game map containing numbers, 
+        that represents actual of actual game.
+        :return: True if the game is lost.
+        """
         columns, rows = self.map_dimensions()
         self.map = []
         for y in range(rows):
@@ -232,6 +312,14 @@ class MineField:
         return False
 
     def solver(self) -> bool:
+        """
+        Solves the minesweeper.
+        It uses 2 algorithms:
+        _solver()
+        linear_equasions()
+        
+        :return: False if lost.
+        """
         # TODO: no bo ten rozwiązywacz równań i tak jakoś ma dość duży pustych równań
         # Czemu one się dodaja pomimo że nie powinny?
         # Kto to wie a kto nie ten niech wie....
@@ -261,7 +349,6 @@ class MineField:
                         print('CHOOSING RANDOM SAVE SPOT ({} prob)'.format(abs(min_prob)))
                         x, y = min
                         self.left_click(x, y)
-
 
     def in_bounds(self, _x: int, _y: int):
         return 0 <= _y < self.columns and 0 <= _x < self.rows
@@ -422,6 +509,9 @@ class MineField:
         return None
 
     def click_middle_field(self):
+        """
+        Clicks middle field.
+        """
         print('CHOOSING MIDDLE FIELD')
         width, height = self.map_dimensions()
         width, height = width // 2, height // 2
@@ -447,6 +537,9 @@ class MineField:
 
 
 def test_number_finding():
+    """
+    Tests that check if exctraction numbers from a image still works! 
+    """
     def _test_number_finding(path):
         from PIL import Image
 
@@ -518,7 +611,7 @@ def test_number_finding():
     assert got == ans
 
 
-test_number_finding()
+# test_number_finding()
 
 if __name__ == '__main__':
     mine_field = MineField()
