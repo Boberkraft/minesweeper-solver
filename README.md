@@ -10,6 +10,16 @@ It works only with _Minesweeper X_ that is is included.
 
 But if you have a distribution that have exactly the same dimensions of a game and field, solver will work too!
 
+## How to use:
+Instal dependencies:
+ ```pip install -r requirements.txt```
+
+ 
+Turn on _Minesweeper X.exe_ and then _MineField.py_.
+
+Remember that your _Minesweeper X_ window needs to be on top.
+
+### How?
 It uses 2 algorithms:
 
 Simple one:
