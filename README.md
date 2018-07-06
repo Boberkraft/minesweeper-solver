@@ -55,5 +55,5 @@ Solutions:
     b = 0
 
 Answer:
-e and b are not a mine.
+e and b are not mines.
 ```
