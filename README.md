@@ -52,7 +52,7 @@ Solutions:
     b + c + d             = 1
         c + d + 0         = 1
     -------------------------
-    b = 0
+    b                     = 0
 
 Answer:
 e and b are not mines.
