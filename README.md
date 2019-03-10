@@ -14,7 +14,7 @@ But if you have a distribution that have exactly the same dimensions of a game a
 Instal dependencies:
  ```pip install -r requirements.txt```
 
- 
+
 Turn on _Minesweeper X.exe_ and then _MineField.py_.
 
 Remember that your _Minesweeper X_ window needs to be on top.

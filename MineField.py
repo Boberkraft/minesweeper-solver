@@ -17,6 +17,12 @@ class MineField:
     FIELD_HEIGHT = 16
 
     # Color of a pixel that identifies what number a field is
+    OPTIONS = {
+        "solve_everything": True,
+        "use_lucky_choice": True,
+        "clicking_speed": 0,
+    }
+
     NUMBERS = {
         (192, 192, 192): 0,
         (0, 0, 255): 1,
@@ -124,9 +130,9 @@ class MineField:
         x, y = self._from_tile(tile_x, tile_y)
         x += self.win_rect['left']
         y += self.win_rect['top']
-        # sleep(0.02)
+        sleep(self.OPTIONS["clicking_speed"]/2)
         win32api.SetCursorPos((x, y))
-        # sleep(0.02)
+        sleep(self.OPTIONS["clicking_speed"] / 2)
         win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, x, y, 0, 0)
 
         win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, x, y, 0, 0)
@@ -141,9 +147,9 @@ class MineField:
         x, y = self._from_tile(tile_x, tile_y)
         x += self.win_rect['left']
         y += self.win_rect['top']
-        # sleep(0.02)
+        sleep(self.OPTIONS["clicking_speed"] / 2)
         win32api.SetCursorPos((x, y))
-        # sleep(0.02)
+        sleep(self.OPTIONS["clicking_speed"] / 2)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, x, y, 0, 0)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, x, y, 0, 0)
 
@@ -330,30 +336,41 @@ class MineField:
                 return False
             changed = self._solver()
             if not changed:
-                _min, _max, changed = self.linear_equasions()
-                # print(_min, _max, changed)
-                if changed is None:
-                    return True
-                if changed is False:
-                    # lets try our luck
-                    (min, min_prob), (max, max_prob) = _min, _max
-                    dmin, dmax = abs(min_prob), (1 - max_prob)
-                    if dmin > dmax:
-                        # wartości maksymalnej jest bliżej do 0 lub 1
-                        x, y = max
-                        print('CHOOSING RANDOM BOMB ({} prob))'.format(abs(max_prob)))
-                        self.right_click(x, y)
+                if self.OPTIONS["use_lucky_choice"]:
+                    did_lucky_changed = self.lucky_click()
+                    if did_lucky_changed:
+                        return True
+                else:
+                    return False
+            if not self.OPTIONS["solve_everything"]:
+                break
 
-                    else:
-                        # wartości minimalna jest bliżej do 0 lub 1
-                        print('CHOOSING RANDOM SAVE SPOT ({} prob)'.format(abs(min_prob)))
-                        x, y = min
-                        self.left_click(x, y)
+    def lucky_click(self):
+        _min, _max, changed = self.linear_equasions()
+        # print(_min, _max, changed)
+        if changed is None:
+            return True
+        if changed is False:
+            # lets try our luck
+            (min, min_prob), (max, max_prob) = _min, _max
+            dmin, dmax = abs(min_prob), (1 - max_prob)
+            if dmin > dmax:
+                # wartości maksymalnej jest bliżej do 0 lub 1
+                x, y = max
+                print('CHOOSING RANDOM BOMB ({} prob))'.format(abs(max_prob)))
+                self.right_click(x, y)
+
+            else:
+                # wartości minimalna jest bliżej do 0 lub 1
+                print('CHOOSING RANDOM SAVE SPOT ({} prob)'.format(abs(min_prob)))
+                x, y = min
+                self.left_click(x, y)
 
     def in_bounds(self, _x: int, _y: int):
         return 0 <= _y < self.columns and 0 <= _x < self.rows
 
     def _solver(self):
+        """The simple version"""
         changed = False
 
         for y in range(self.columns):
@@ -397,7 +414,14 @@ class MineField:
                                             # self.net_mask[_y][_x] = 1
         return changed
 
+    def press_random_field(self):
+        self._press_random_field()
+
     def _press_random_field(self):
+        """
+        For now it just click first bomb.
+        :return: (x, y) of clicked position. 
+        """
         for y in range(self.columns):
             for x in range(self.rows):
                 if self.map[y][x] == -1:
@@ -407,6 +431,13 @@ class MineField:
         return None, None
 
     def linear_equasions(self):
+        """
+        Advanced version of solver.
+        If it have 100% chance of successful click, it does it.
+        If not, it returns positions of prob safe spots/bombs and
+        :return: (((x,y), prob) ((x, y), prob), changed) 
+        #TODO: i think. Not sure
+        """
         def do_equasion(x, y):
             eq = dict()
             sum = self.map[y][x]
