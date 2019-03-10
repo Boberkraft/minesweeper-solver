@@ -54,7 +54,8 @@ class App:
         mine_field.OPTIONS["use_lucky_choice"] = self.OPTIONS["use_lucky_choice"].get()
         mine_field.OPTIONS["clicking_speed"] = float(self.OPTIONS["clicking_speed"].get())
         while True:
-            if bool(self.OPTIONS["click_middle"].get()):
+            if bool(self.OPTIONS["click_middle"].get())\
+                    and mine_field.OPTIONS["use_lucky_choice"]:
                 mine_field.click_middle_field()
             solved = mine_field.solver()
             if not solved and bool(self.OPTIONS["solve_everything_forever"].get()):
