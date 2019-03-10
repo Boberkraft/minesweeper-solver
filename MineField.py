@@ -130,9 +130,8 @@ class MineField:
         x, y = self._from_tile(tile_x, tile_y)
         x += self.win_rect['left']
         y += self.win_rect['top']
-        sleep(self.OPTIONS["clicking_speed"]/2)
+        sleep(self.OPTIONS["clicking_speed"])
         win32api.SetCursorPos((x, y))
-        sleep(self.OPTIONS["clicking_speed"] / 2)
         win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, x, y, 0, 0)
 
         win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, x, y, 0, 0)
@@ -147,9 +146,9 @@ class MineField:
         x, y = self._from_tile(tile_x, tile_y)
         x += self.win_rect['left']
         y += self.win_rect['top']
-        sleep(self.OPTIONS["clicking_speed"] / 2)
+        sleep(self.OPTIONS["clicking_speed"])
         win32api.SetCursorPos((x, y))
-        sleep(self.OPTIONS["clicking_speed"] / 2)
+
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, x, y, 0, 0)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, x, y, 0, 0)
 

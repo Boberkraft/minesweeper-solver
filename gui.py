@@ -38,7 +38,7 @@ class App:
         ttk.Label(b_frame, text="Przerwa pomiędzy\nkliknięciami (s):").grid(row=3,column=0)
         entry = Entry(b_frame,
                       textvariable=self.OPTIONS["clicking_speed"])
-        self.OPTIONS["clicking_speed"].set(0.4)
+        self.OPTIONS["clicking_speed"].set(0.0)
         entry.config(width=4)
         entry.grid(row=3, column=1)
 
@@ -47,14 +47,18 @@ class App:
     def run_solver(self):
         print("running solver")
         mine_field = MineField()
+
         mine_field.OPTIONS["solve_everything"] = self.OPTIONS["solve_everything"].get()
         mine_field.OPTIONS["use_lucky_choice"] = self.OPTIONS["use_lucky_choice"].get()
         mine_field.OPTIONS["clicking_speed"] = float(self.OPTIONS["clicking_speed"].get())
         while True:
             solved = mine_field.solver()
+            if not solved and bool(self.OPTIONS["solve_everything_forever"].get()):
+                mine_field.restart()
+                mine_field.click_middle_field()
             if not self.OPTIONS["solve_everything_forever"].get() \
                     or solved \
-                    or mine_field.OPTIONS["use_lucky_choice"]:
+                    or not mine_field.OPTIONS["use_lucky_choice"]:
                 break
 
 
