@@ -1,9 +1,9 @@
 # A _simple_ minesweeper solver
 
-![Presentation](gameplay.gif)
+![Presentation](github/gameplay.gif)
 
 
-![Presentation](scores.png)
+![Presentation](github/scores.png)
 
 
 It works only with _Minesweeper X_ that is is included.
@@ -34,7 +34,7 @@ if (Mines nearby == 0):
 
 More Advanced one using linear algebra:
 
-![Algebra Solving](solve.png)
+![Algebra Solving](github/solve.png)
 ```
 The map:
 a + b + c                 = 1
