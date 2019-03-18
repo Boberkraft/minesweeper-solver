@@ -19,11 +19,13 @@ class App:
         title.pack()
 
         ttk.Button(mainframe, text="Działaj!", command=self.run_solver).pack()
+        # ttk.Button(mainframe, text="Test", command=self.test).pack()
 
         # initialize variables
         self.OPTIONS["solve_everything"] = IntVar()
         self.OPTIONS["solve_everything_forever"] = IntVar()
         self.OPTIONS["use_lucky_choice"] = IntVar()
+        self.OPTIONS["use_smart_choice"] = IntVar()
         self.OPTIONS["click_middle"] = IntVar()
         self.OPTIONS["clicking_speed"] = StringVar()
         b_frame = Frame(mainframe)
@@ -34,37 +36,46 @@ class App:
                         variable=self.OPTIONS["solve_everything_forever"]).grid(row=1, sticky=W)
         ttk.Checkbutton(b_frame, text="Kliknij w środek na początek",
                         variable=self.OPTIONS["click_middle"]).grid(row=2, sticky=W)
+        ttk.Checkbutton(b_frame, text="Użyj mądrego rozwiązywania",
+                        variable=self.OPTIONS["use_smart_choice"]).grid(row=3, sticky=W)
         ttk.Checkbutton(b_frame, text="Umożliwij zgadywanie",
-                        variable=self.OPTIONS["use_lucky_choice"]).grid(row=3, sticky=W)
+                        variable=self.OPTIONS["use_lucky_choice"]).grid(row=4, sticky=W)
 
-        ttk.Label(b_frame, text="Przerwa pomiędzy\nkliknięciami (s):").grid(row=4, column=0)
+        ttk.Label(b_frame, text="Przerwa pomiędzy\nkliknięciami (s):").grid(row=5, column=0)
         entry = Entry(b_frame,
                       textvariable=self.OPTIONS["clicking_speed"])
         self.OPTIONS["clicking_speed"].set(0.0)
         entry.config(width=4)
-        entry.grid(row=4, column=1)
+        entry.grid(row=5, column=1)
 
         b_frame.pack()
 
+    def test(self):
+        x = self.run_solver()
+        x.test()
+
     def run_solver(self):
-        print("running solver")
+        print("Running solver")
         mine_field = MineField()
 
         mine_field.OPTIONS["solve_everything"] = self.OPTIONS["solve_everything"].get()
         mine_field.OPTIONS["use_lucky_choice"] = self.OPTIONS["use_lucky_choice"].get()
+        mine_field.OPTIONS["use_smart_choice"] = self.OPTIONS["use_smart_choice"].get()
         mine_field.OPTIONS["clicking_speed"] = float(self.OPTIONS["clicking_speed"].get())
+        # print(mine_field.OPTIONS)
         while True:
             if bool(self.OPTIONS["click_middle"].get())\
                     and mine_field.OPTIONS["use_lucky_choice"]:
                 mine_field.click_middle_field()
+
             solved = mine_field.solver()
             if not solved and bool(self.OPTIONS["solve_everything_forever"].get()):
                 mine_field.restart()
             if not self.OPTIONS["solve_everything_forever"].get() \
                     or solved \
-                    or not mine_field.OPTIONS["use_lucky_choice"]:
+                    or not mine_field.OPTIONS["use_lucky_choice"].get():
                 break
-
+        return mine_field
 
 if __name__ == '__main__':
     root = Tk()

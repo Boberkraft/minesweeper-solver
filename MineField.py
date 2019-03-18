@@ -19,19 +19,20 @@ class MineField:
     # Color of a pixel that identifies what number a field is
     OPTIONS = {
         "solve_everything": True,
+        "use_smart_choice": True,
         "use_lucky_choice": True,
-        "clicking_speed": 0,
+        "clicking_speed"  : 0,
     }
 
     NUMBERS = {
         (192, 192, 192): 0,
-        (0, 0, 255): 1,
-        (0, 128, 0): 2,
-        (255, 0, 0): 3,
-        (0, 0, 128): 4,
-        (128, 0, 0): 5,
-        (0, 128, 128): 6,
-        (0, 0, 0): 7,
+        (0, 0, 255)    : 1,
+        (0, 128, 0)    : 2,
+        (255, 0, 0)    : 3,
+        (0, 0, 128)    : 4,
+        (128, 0, 0)    : 5,
+        (0, 128, 128)  : 6,
+        (0, 0, 0)      : 7,
         (128, 128, 128): 8
     }
     DARK_GREY = (128, 128, 128)
@@ -250,10 +251,12 @@ class MineField:
         elif image.pixel(x, y) == self.WHITE:
             # uncovered field subtree
             if image.pixel(x + 8, y + 8) == self.BLACK:
-                return -4 # flag
-            return -1 # uncovered field
+                return -4  # flag
+            return -1  # uncovered field
         else:
-            raise Exception('{}x{} contains unknown field type\n\nHave you covered minesweeper screen?\nor moved it!?'.format(tile_x, tile_y))
+            raise Exception(
+                '{}x{} contains unknown field type\n\nHave you covered minesweeper screen?\nor moved it!?'.format(
+                    tile_x, tile_y))
 
     def map_dimensions(self) -> (int, int):
         """
@@ -328,6 +331,7 @@ class MineField:
         # TODO: no bo ten rozwiązywacz równań i tak jakoś ma dość duży pustych równań
         # Czemu one się dodaja pomimo że nie powinny?
         # Kto to wie a kto nie ten niech wie....
+
         while True:
             lost = self.refresh()
             if lost:
@@ -335,21 +339,24 @@ class MineField:
                 return False
             changed = self._solver()
             if not changed:
-                if self.OPTIONS["use_lucky_choice"]:
-                    did_lucky_changed = self.lucky_click()
-                    if did_lucky_changed:
-                        return True
+                if self.OPTIONS["use_smart_choice"]:
+                    did_smart_changed = self.smart_click()
+                    if not did_smart_changed:
+                        return False
                 else:
                     return False
+
             if not self.OPTIONS["solve_everything"]:
                 break
 
-    def lucky_click(self):
-        _min, _max, changed = self.linear_equasions()
+    def smart_click(self):
+        _min, _max, changed = self.linear_equasions()  # does the click
         # print(_min, _max, changed)
-        if changed is None:
+        if changed is True:
             return True
         if changed is False:
+            if not self.OPTIONS["use_lucky_choice"]:
+                return False
             # lets try our luck
             (min, min_prob), (max, max_prob) = _min, _max
             dmin, dmax = abs(min_prob), (1 - max_prob)
@@ -364,6 +371,8 @@ class MineField:
                 print('CHOOSING RANDOM SAVE SPOT ({} prob)'.format(abs(min_prob)))
                 x, y = min
                 self.left_click(x, y)
+            return True # sometching must have changed
+
 
     def in_bounds(self, _x: int, _y: int):
         return 0 <= _y < self.columns and 0 <= _x < self.rows
@@ -437,6 +446,7 @@ class MineField:
         :return: (((x,y), prob) ((x, y), prob), changed) 
         #TODO: i think. Not sure
         """
+
         def do_equasion(x, y):
             eq = dict()
             sum = self.map[y][x]
@@ -507,10 +517,13 @@ class MineField:
         changed = False
         for i, prob in enumerate(solution):
             key = keys[i]
+
             if prob == 0:
+                print("SMART CHOICE:")
                 self.left_click(*key)
                 changed = True
             if prob == 1:
+                print("SMART CHOICE:")
                 self.right_click(*key)
                 changed = True
         min_index, min_prob = min(enumerate(solution), key=lambda p: abs(p[1]))
@@ -537,6 +550,19 @@ class MineField:
                     self._for_search(x, y, q)
                     return q
         return None
+
+    def test(self):
+        self.test_show_map()
+
+    def test_show_map(self):
+        ans = []
+        rows, columns = self.map_dimensions()
+        for y in range(rows):
+            row = []
+            for x in range(columns):
+                ans.append(self.get_number(x, y))
+                row.append(self.get_number(x, y))
+            print(' '.join(' ' + str(n) if n >= 0 else str(n) for n in row))
 
     def click_middle_field(self):
         """
@@ -570,6 +596,7 @@ def test_number_finding():
     """
     Tests that check if exctraction numbers from a image still works! 
     """
+
     def _test_number_finding(path):
         from PIL import Image
 
@@ -672,10 +699,5 @@ if __name__ == '__main__':
 #
 # print(mine_field.map_dimensions())
 # print(mine_field.win_rect)
-# for y in range(rows):
-#     row = []
-#     for x in range(columns):
-#         ans.append(mine_field.get_number(x, y))
-#         row.append(mine_field.get_number(x, y))
-#     print(' '.join(' ' + str(n) if n >= 0 else str(n) for n in row))
+
 # print(ans)
