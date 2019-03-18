@@ -7,6 +7,7 @@ class App:
     OPTIONS = {
         "solve_everything": None,
         "use_lucky_choice": None,
+        "use_smart_choice": None,
         "clicking_speed"  : None,
     }
 
@@ -19,7 +20,7 @@ class App:
         title.pack()
 
         ttk.Button(mainframe, text="Działaj!", command=self.run_solver).pack()
-        # ttk.Button(mainframe, text="Test", command=self.test).pack()
+        ttk.Button(mainframe, text="Test", command=self.test).pack()
 
         # initialize variables
         self.OPTIONS["solve_everything"] = IntVar()
@@ -64,18 +65,19 @@ class App:
         mine_field.OPTIONS["clicking_speed"] = float(self.OPTIONS["clicking_speed"].get())
         # print(mine_field.OPTIONS)
         while True:
-            if bool(self.OPTIONS["click_middle"].get())\
+            if self.OPTIONS["click_middle"].get() \
                     and mine_field.OPTIONS["use_lucky_choice"]:
                 mine_field.click_middle_field()
 
             solved = mine_field.solver()
-            if not solved and bool(self.OPTIONS["solve_everything_forever"].get()):
+            if solved:
+                return mine_field
+            if self.OPTIONS["solve_everything_forever"].get():
                 mine_field.restart()
-            if not self.OPTIONS["solve_everything_forever"].get() \
-                    or solved \
-                    or not mine_field.OPTIONS["use_lucky_choice"].get():
-                break
-        return mine_field
+            else:
+                return mine_field
+
+
 
 if __name__ == '__main__':
     root = Tk()

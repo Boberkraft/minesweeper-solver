@@ -41,7 +41,7 @@ class MineField:
     BLACK = (0, 0, 0)
 
     # max number of fields that can go into one equation at once?
-    LINEAR_SEARCH_RANGE = 300
+    LINEAR_SEARCH_RANGE = 4000
 
     # THE MEANING OF NUMBERS IN MAP
     # 0 is an empty field
@@ -98,8 +98,8 @@ class MineField:
         Creates a new netmask and reflashes game.
         """
         # sleep(1)
-        self.rows, self.columns = self.map_dimensions()
-        self.net_mask = [[0 for _ in range(self.rows)] for _ in range(self.rows)]
+        self.columns, self.rows = self.map_dimensions()
+        self.net_mask = [[0 for _ in range(self.columns)] for _ in range(self.rows)]
         self.refresh()  # załaduj obraz mape
         # sleep(1)
 
@@ -261,7 +261,7 @@ class MineField:
     def map_dimensions(self) -> (int, int):
         """
         Gives dimensions of a game. 
-        :return: (collumns, rows) 
+        :return: (columns, rows) 
         """
         return self.field_dimensions(self.win_rect['width'], self.win_rect['height'])
 
@@ -342,9 +342,9 @@ class MineField:
                 if self.OPTIONS["use_smart_choice"]:
                     did_smart_changed = self.smart_click()
                     if not did_smart_changed:
-                        return False
+                        return True
                 else:
-                    return False
+                    return True
 
             if not self.OPTIONS["solve_everything"]:
                 break
@@ -371,18 +371,16 @@ class MineField:
                 print('CHOOSING RANDOM SAVE SPOT ({} prob)'.format(abs(min_prob)))
                 x, y = min
                 self.left_click(x, y)
-            return True # sometching must have changed
-
+            return True  # sometching must have changed
 
     def in_bounds(self, _x: int, _y: int):
-        return 0 <= _y < self.columns and 0 <= _x < self.rows
+        return 0 <= _y < self.rows and 0 <= _x < self.columns
 
     def _solver(self):
         """The simple version"""
         changed = False
-
-        for y in range(self.columns):
-            for x in range(self.rows):
+        for y in range(self.rows):
+            for x in range(self.columns):
                 if self.net_mask[y][x] == 0:
                     num = self.map[y][x]
                     if 0 < num <= 7:
@@ -472,7 +470,8 @@ class MineField:
 
         for _x, _y in candidates:
             equasion, sum = do_equasion(_x, _y)
-            # print(equasion, sum, 'for {} x {}'.format(_x, _y))
+            # if equasion:
+            # print(equasion, "=", sum, 'for field({}, {})'.format(_x, _y))
 
             variables.update(equasion)
             equasions.append(equasion)
@@ -505,7 +504,7 @@ class MineField:
             # print('Dokładne obliczanie równanie!!!!')
         except:
             x = np.linalg.lstsq(a, b)
-            # print(x)
+            # print(x[0])
             solution = x[0].round(decimals=3)
             # print('-' * 10)
             # print('Niedokładne obliczanie równania')
@@ -542,8 +541,8 @@ class MineField:
                     yield _x, _y
 
     def _get_candidate(self):
-        for y in range(self.columns):
-            for x in range(self.rows):
+        for y in range(self.rows):
+            for x in range(self.columns):
                 if self.net_mask[y][x] == 0 and 0 < self.map[y][x] <= 8:
                     q = set()
                     # print('The candidate!', x, y)
@@ -552,17 +551,21 @@ class MineField:
         return None
 
     def test(self):
-        self.test_show_map()
+        # print(repr(self))
+        pass
 
     def test_show_map(self):
         ans = []
-        rows, columns = self.map_dimensions()
+        columns, rows = self.map_dimensions()
         for y in range(rows):
             row = []
             for x in range(columns):
                 ans.append(self.get_number(x, y))
                 row.append(self.get_number(x, y))
             print(' '.join(' ' + str(n) if n >= 0 else str(n) for n in row))
+
+    def test_show_net_mask(self):
+        self.net_mask()
 
     def click_middle_field(self):
         """
